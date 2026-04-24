@@ -1,53 +1,58 @@
 import React, { useEffect } from 'react'
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm, useFieldArray, type FieldErrors, type UseFormRegister } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { taskNodeSchema, TaskNodeFormData } from '../../types/schemas'
-import { useWorkflowStore } from '../../store/workflowStore'
 import { Input } from '../ui/Input'
 import { KeyValueEditor } from '../ui/KeyValueEditor'
-import { WorkflowNode } from '../../types'
+import { WorkflowNode, isTaskNode } from '../../types'
 
 interface TaskNodeFormProps {
   node: WorkflowNode
+  onUpdate: (id: string, data: Partial<TaskNodeFormData>) => void
+  onDirtyChange?: (isDirty: boolean) => void
 }
 
-export const TaskNodeForm: React.FC<TaskNodeFormProps> = ({ node }) => {
-  const { updateNodeData } = useWorkflowStore()
-  const data = node.data as any
+export const TaskNodeForm: React.FC<TaskNodeFormProps> = ({ node, onUpdate, onDirtyChange }) => {
+  const data = isTaskNode(node.data)
+    ? node.data
+    : { type: 'task' as const, id: node.id, label: node.data.label, description: '', assignee: '', dueDate: '', customFields: [] }
 
   const {
     register,
     control,
     watch,
-    formState: { errors }
+    formState: { errors, isDirty },
   } = useForm<TaskNodeFormData>({
-    resolver: zodResolver(taskNodeSchema) as any,
+    resolver: zodResolver(taskNodeSchema),
     defaultValues: {
       label: data.label,
-      description: data.description || '',
-      assignee: data.assignee || '',
-      dueDate: data.dueDate || '',
-      customFields: data.customFields || []
-    }
-  })
-
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'customFields'
+      description: data.description ?? '',
+      assignee: data.assignee ?? '',
+      dueDate: data.dueDate ?? '',
+      customFields: data.customFields ?? [],
+    },
   })
 
   useEffect(() => {
-    const subscription = watch((values) => {
-      const parsed = taskNodeSchema.safeParse(values)
-      if (parsed.success) {
-        const timeoutId = setTimeout(() => {
-          updateNodeData(node.id, parsed.data)
-        }, 300)
-        return () => clearTimeout(timeoutId)
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'customFields',
+  })
+
+  const watchedValues = watch()
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      const result = taskNodeSchema.safeParse(watchedValues)
+      if (result.success) {
+        onUpdate(node.id, result.data)
       }
-    })
-    return () => subscription.unsubscribe()
-  }, [watch, node.id, updateNodeData])
+    }, 300)
+    return () => clearTimeout(timeoutId)
+  }, [JSON.stringify(watchedValues)]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-4">
@@ -81,9 +86,9 @@ export const TaskNodeForm: React.FC<TaskNodeFormProps> = ({ node }) => {
           fields={fields}
           onAdd={() => append({ key: '', value: '' })}
           onRemove={remove}
-          register={register}
+          register={register as unknown as UseFormRegister<Record<string, unknown>>}
           name="customFields"
-          errors={errors.customFields as any}
+          errors={errors.customFields as unknown as FieldErrors<Record<string, unknown>>[string]}
         />
       </div>
     </div>

@@ -8,9 +8,14 @@ import { WorkflowCanvas } from './components/canvas/WorkflowCanvas'
 import { NodeEditPanel } from './components/panels/NodeEditPanel'
 import { SandboxPanel } from './components/panels/SandboxPanel'
 import { useWorkflowStore } from './store/workflowStore'
+import { useUiStore } from './store/uiStore'
 
 function App() {
-  const { isSandboxOpen } = useWorkflowStore()
+  const { isSandboxOpen, isDarkMode } = useUiStore()
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode)
+  }, [isDarkMode])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -28,7 +33,7 @@ function App() {
   }, [])
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50 font-sans">
+    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <TopBar />
 
       <div className="flex-1 flex overflow-hidden relative">

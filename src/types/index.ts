@@ -1,19 +1,22 @@
 export type NodeType = 'start' | 'task' | 'approval' | 'automated' | 'end'
+export type SimulationStatus = 'idle' | 'running' | 'completed' | 'failed' | 'pending'
 
 export interface MetaField { key: string; value: string }
 
-export interface BaseNodeData extends Record<string, unknown> {
+export interface BaseNodeData {
   id: string
   label: string
   validationErrors?: string[]
-  simulationStatus?: 'idle' | 'running' | 'completed' | 'failed' | 'pending'
+  simulationStatus?: SimulationStatus
 }
 
 export interface StartNodeData extends BaseNodeData {
+  type: 'start'
   metadata: MetaField[]
 }
 
 export interface TaskNodeData extends BaseNodeData {
+  type: 'task'
   description: string
   assignee: string
   dueDate: string
@@ -21,29 +24,36 @@ export interface TaskNodeData extends BaseNodeData {
 }
 
 export interface ApprovalNodeData extends BaseNodeData {
+  type: 'approval'
   approverRole: 'Manager' | 'HRBP' | 'Director' | 'CEO'
   autoApproveThreshold: number
 }
 
 export interface AutomatedNodeData extends BaseNodeData {
+  type: 'automated'
   actionId: string
   actionParams: Record<string, string>
 }
 
 export interface EndNodeData extends BaseNodeData {
+  type: 'end'
   endMessage: string
   summaryFlag: boolean
 }
 
 export type AnyNodeData =
-  | StartNodeData | TaskNodeData | ApprovalNodeData
-  | AutomatedNodeData | EndNodeData
+  | StartNodeData
+  | TaskNodeData
+  | ApprovalNodeData
+  | AutomatedNodeData
+  | EndNodeData
 
 export interface WorkflowNode {
   id: string
   type: NodeType
   position: { x: number; y: number }
   data: AnyNodeData
+  selected?: boolean
 }
 
 export interface WorkflowEdge {
@@ -51,6 +61,7 @@ export interface WorkflowEdge {
   source: string
   target: string
   label?: string
+  type?: string
 }
 
 export interface AutomationAction {
@@ -72,7 +83,7 @@ export interface SimulationStep {
 export interface SimulationResult {
   success: boolean
   steps: SimulationStep[]
-  errors?: string[]
+  errors?: ValidationError[]
 }
 
 export interface ValidationError {
@@ -88,3 +99,17 @@ export interface WorkflowTemplate {
   nodes: WorkflowNode[]
   edges: WorkflowEdge[]
 }
+
+export interface WorkflowFile {
+  version: string
+  name: string
+  exportedAt: string
+  nodes: WorkflowNode[]
+  edges: WorkflowEdge[]
+}
+
+export function isStartNode(d: AnyNodeData): d is StartNodeData { return d.type === 'start' }
+export function isTaskNode(d: AnyNodeData): d is TaskNodeData { return d.type === 'task' }
+export function isApprovalNode(d: AnyNodeData): d is ApprovalNodeData { return d.type === 'approval' }
+export function isAutomatedNode(d: AnyNodeData): d is AutomatedNodeData { return d.type === 'automated' }
+export function isEndNode(d: AnyNodeData): d is EndNodeData { return d.type === 'end' }

@@ -1,6 +1,12 @@
 import { http, HttpResponse, delay } from 'msw'
+import type { WorkflowNode, WorkflowEdge } from '../types'
 import { simulateExecution } from './simulationEngine'
 import { validateWorkflowGraph } from '../utils/graphValidation'
+
+interface SimulateRequestBody {
+  nodes: WorkflowNode[]
+  edges: WorkflowEdge[]
+}
 
 export const handlers = [
   http.get('/automations', async () => {
@@ -18,27 +24,27 @@ export const handlers = [
 
   http.post('/simulate', async ({ request }) => {
     await delay(600)
-    const workflow = await request.json() as { nodes: any[], edges: any[] }
-    const errors = validateWorkflowGraph(workflow)
-    if (errors.filter(e => e.severity === 'error').length > 0) {
+    const body = await request.json() as SimulateRequestBody
+    const errors = validateWorkflowGraph(body)
+    const criticalErrors = errors.filter(e => e.severity === 'error')
+    if (criticalErrors.length > 0) {
       return HttpResponse.json({ success: false, errors }, { status: 422 })
     }
-    const steps = simulateExecution(workflow)
+    const steps = simulateExecution(body)
     return HttpResponse.json({ success: true, steps })
   }),
 
   http.get('/workflows', async () => {
     await delay(300)
     return HttpResponse.json([
-      { id: 'onboarding-v1', name: 'Employee Onboarding', nodeCount: 7, updatedAt: '2025-01-15' },
+      { id: 'onboarding-v1', name: 'Employee Onboarding', nodeCount: 6, updatedAt: '2025-01-15' },
       { id: 'leave-approval', name: 'Leave Approval', nodeCount: 4, updatedAt: '2025-01-10' },
-      { id: 'doc-verification', name: 'Document Verification', nodeCount: 5, updatedAt: '2025-01-08' },
     ])
   }),
 
   http.post('/workflows', async ({ request }) => {
     await delay(400)
-    const body = await request.json() as any
+    const body = await request.json() as Record<string, unknown>
     return HttpResponse.json({ id: `workflow-${Date.now()}`, ...body }, { status: 201 })
   }),
 ]

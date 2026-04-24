@@ -2,44 +2,49 @@ import React, { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { endNodeSchema, EndNodeFormData } from '../../types/schemas'
-import { useWorkflowStore } from '../../store/workflowStore'
 import { Input } from '../ui/Input'
 import { Toggle } from '../ui/Toggle'
-import { WorkflowNode } from '../../types'
+import { WorkflowNode, isEndNode } from '../../types'
 
 interface EndNodeFormProps {
   node: WorkflowNode
+  onUpdate: (id: string, data: Partial<EndNodeFormData>) => void
+  onDirtyChange?: (isDirty: boolean) => void
 }
 
-export const EndNodeForm: React.FC<EndNodeFormProps> = ({ node }) => {
-  const { updateNodeData } = useWorkflowStore()
-  const data = node.data as any
+export const EndNodeForm: React.FC<EndNodeFormProps> = ({ node, onUpdate, onDirtyChange }) => {
+  const data = isEndNode(node.data)
+    ? node.data
+    : { type: 'end' as const, id: node.id, label: node.data.label, endMessage: '', summaryFlag: false }
 
   const {
     register,
     watch,
-    formState: { errors }
+    formState: { errors, isDirty },
   } = useForm<EndNodeFormData>({
-    resolver: zodResolver(endNodeSchema) as any,
+    resolver: zodResolver(endNodeSchema),
     defaultValues: {
       label: data.label,
-      endMessage: data.endMessage || '',
-      summaryFlag: data.summaryFlag || false
-    }
+      endMessage: data.endMessage ?? '',
+      summaryFlag: data.summaryFlag ?? false,
+    },
   })
 
   useEffect(() => {
-    const subscription = watch((values) => {
-      const parsed = endNodeSchema.safeParse(values)
-      if (parsed.success) {
-        const timeoutId = setTimeout(() => {
-          updateNodeData(node.id, parsed.data)
-        }, 300)
-        return () => clearTimeout(timeoutId)
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
+
+  const watchedValues = watch()
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      const result = endNodeSchema.safeParse(watchedValues)
+      if (result.success) {
+        onUpdate(node.id, result.data)
       }
-    })
-    return () => subscription.unsubscribe()
-  }, [watch, node.id, updateNodeData])
+    }, 300)
+    return () => clearTimeout(timeoutId)
+  }, [JSON.stringify(watchedValues)]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-6">

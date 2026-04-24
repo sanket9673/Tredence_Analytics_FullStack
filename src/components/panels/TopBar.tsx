@@ -1,22 +1,33 @@
-import React, { useRef } from 'react'
+import React, { useRef, useSyncExternalStore } from 'react'
 import { LayoutDashboard, ShieldCheck, Upload, Download, Play, Undo2, Redo2 } from 'lucide-react'
-import { useUIStore } from '../../store/uiStore'
+import { useUiStore } from '../../store/uiStore'
 import { useWorkflowStore } from '../../store/workflowStore'
 import { useAutoSave } from '../../hooks/useAutoSave'
 import { getLayoutedElements } from '../../utils/layoutHelpers'
+import { workflowFileSchema } from '../../types/schemas'
+import type { WorkflowNode, WorkflowEdge } from '../../types'
 import toast from 'react-hot-toast'
 
 export const TopBar: React.FC = () => {
-  const { workflowName, setWorkflowName } = useUIStore()
-  const { nodes, edges, setNodes, setIsSandboxOpen, runValidation, importWorkflow } = useWorkflowStore()
+  const { workflowName, setWorkflowName, setIsSandboxOpen } = useUiStore()
+  const { nodes, edges, setNodes, runValidation, importWorkflow } = useWorkflowStore()
   const { lastSaved } = useAutoSave()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const temporalStore = useWorkflowStore.temporal
+  const canUndo = useSyncExternalStore(
+    temporalStore.subscribe,
+    () => temporalStore.getState().pastStates.length > 0,
+    () => false,
+  )
+  const canRedo = useSyncExternalStore(
+    temporalStore.subscribe,
+    () => temporalStore.getState().futureStates.length > 0,
+    () => false,
+  )
+  const { undo, redo } = temporalStore.getState()
 
-  const handleUndo = () => useWorkflowStore.temporal.getState().undo()
-  const handleRedo = () => useWorkflowStore.temporal.getState().redo()
-
-  const canUndo = useWorkflowStore.temporal.getState().pastStates.length > 0
-  const canRedo = useWorkflowStore.temporal.getState().futureStates.length > 0
+  const handleUndo = () => undo()
+  const handleRedo = () => redo()
 
   const handleValidate = () => {
     const errors = runValidation()
@@ -59,20 +70,21 @@ export const TopBar: React.FC = () => {
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const data = JSON.parse(ev.target?.result as string)
-        if (data.nodes && data.edges) {
-          importWorkflow(data.nodes, data.edges)
-          if (data.name) setWorkflowName(data.name)
-          toast.success(`Imported: ${data.name || 'Workflow'}`)
-        } else {
-          toast.error('Invalid workflow file format')
+        const raw: unknown = JSON.parse(ev.target?.result as string)
+        const parsed = workflowFileSchema.safeParse(raw)
+        if (!parsed.success) {
+          toast.error(`Invalid workflow file: ${parsed.error.issues[0]?.message ?? 'unknown error'}`)
+          return
         }
+        importWorkflow(parsed.data.nodes as unknown as WorkflowNode[], parsed.data.edges as unknown as WorkflowEdge[])
+        setWorkflowName(parsed.data.name)
+        toast.success(`Imported: ${parsed.data.name}`)
       } catch {
-        toast.error('Failed to parse JSON file')
+        toast.error('Failed to parse JSON — file may be corrupted')
       }
     }
     reader.readAsText(file)
-    if (fileInputRef.current) fileInputRef.current.value = ''
+    e.target.value = ''
   }
 
   const formatSaveTime = () => {

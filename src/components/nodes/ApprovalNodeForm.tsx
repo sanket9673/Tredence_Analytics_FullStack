@@ -2,46 +2,50 @@ import React, { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { approvalNodeSchema, ApprovalNodeFormData } from '../../types/schemas'
-import { useWorkflowStore } from '../../store/workflowStore'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
-import { WorkflowNode } from '../../types'
+import { WorkflowNode, isApprovalNode } from '../../types'
 
 interface ApprovalNodeFormProps {
   node: WorkflowNode
+  onUpdate: (id: string, data: Partial<ApprovalNodeFormData>) => void
+  onDirtyChange?: (isDirty: boolean) => void
 }
 
-export const ApprovalNodeForm: React.FC<ApprovalNodeFormProps> = ({ node }) => {
-  const { updateNodeData } = useWorkflowStore()
-  const data = node.data as any
+export const ApprovalNodeForm: React.FC<ApprovalNodeFormProps> = ({ node, onUpdate, onDirtyChange }) => {
+  const data = isApprovalNode(node.data)
+    ? node.data
+    : { type: 'approval' as const, id: node.id, label: node.data.label, approverRole: 'Manager' as const, autoApproveThreshold: 80 }
 
   const {
     register,
     watch,
-    formState: { errors }
+    formState: { errors, isDirty },
   } = useForm<ApprovalNodeFormData>({
-    resolver: zodResolver(approvalNodeSchema) as any,
+    resolver: zodResolver(approvalNodeSchema),
     defaultValues: {
       label: data.label,
-      approverRole: data.approverRole || 'Manager',
-      autoApproveThreshold: data.autoApproveThreshold ?? 80
-    }
+      approverRole: data.approverRole ?? 'Manager',
+      autoApproveThreshold: data.autoApproveThreshold ?? 80,
+    },
   })
 
+  useEffect(() => {
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
+
+  const watchedValues = watch()
   const thresholdValue = watch('autoApproveThreshold')
 
   useEffect(() => {
-    const subscription = watch((values) => {
-      const parsed = approvalNodeSchema.safeParse(values)
-      if (parsed.success) {
-        const timeoutId = setTimeout(() => {
-          updateNodeData(node.id, parsed.data)
-        }, 300)
-        return () => clearTimeout(timeoutId)
+    const timeoutId = setTimeout(() => {
+      const result = approvalNodeSchema.safeParse(watchedValues)
+      if (result.success) {
+        onUpdate(node.id, result.data)
       }
-    })
-    return () => subscription.unsubscribe()
-  }, [watch, node.id, updateNodeData])
+    }, 300)
+    return () => clearTimeout(timeoutId)
+  }, [JSON.stringify(watchedValues)]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-6">

@@ -1,50 +1,53 @@
 import React, { useEffect } from 'react'
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm, useFieldArray, type FieldErrors, type UseFormRegister } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { startNodeSchema, StartNodeFormData } from '../../types/schemas'
-import { useWorkflowStore } from '../../store/workflowStore'
 import { Input } from '../ui/Input'
 import { KeyValueEditor } from '../ui/KeyValueEditor'
-import { WorkflowNode } from '../../types'
+import { WorkflowNode, isStartNode } from '../../types'
 
 interface StartNodeFormProps {
   node: WorkflowNode
+  onUpdate: (id: string, data: Partial<StartNodeFormData>) => void
+  onDirtyChange?: (isDirty: boolean) => void
 }
 
-export const StartNodeForm: React.FC<StartNodeFormProps> = ({ node }) => {
-  const { updateNodeData } = useWorkflowStore()
-  const data = node.data as any
+export const StartNodeForm: React.FC<StartNodeFormProps> = ({ node, onUpdate, onDirtyChange }) => {
+  const data = isStartNode(node.data) ? node.data : { type: 'start' as const, id: node.id, label: node.data.label, metadata: [] }
 
   const {
     register,
     control,
     watch,
-    formState: { errors }
+    formState: { errors, isDirty },
   } = useForm<StartNodeFormData>({
-    resolver: zodResolver(startNodeSchema) as any,
+    resolver: zodResolver(startNodeSchema),
     defaultValues: {
       label: data.label,
-      metadata: data.metadata || []
-    }
-  })
-
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'metadata'
+      metadata: data.metadata ?? [],
+    },
   })
 
   useEffect(() => {
-    const subscription = watch((values) => {
-      const parsed = startNodeSchema.safeParse(values)
-      if (parsed.success) {
-        const timeoutId = setTimeout(() => {
-          updateNodeData(node.id, parsed.data)
-        }, 300)
-        return () => clearTimeout(timeoutId)
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'metadata',
+  })
+
+  const watchedValues = watch()
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      const result = startNodeSchema.safeParse(watchedValues)
+      if (result.success) {
+        onUpdate(node.id, result.data)
       }
-    })
-    return () => subscription.unsubscribe()
-  }, [watch, node.id, updateNodeData])
+    }, 300)
+    return () => clearTimeout(timeoutId)
+  }, [JSON.stringify(watchedValues)]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-6">
@@ -60,9 +63,9 @@ export const StartNodeForm: React.FC<StartNodeFormProps> = ({ node }) => {
           fields={fields}
           onAdd={() => append({ key: '', value: '' })}
           onRemove={remove}
-          register={register}
+          register={register as unknown as UseFormRegister<Record<string, unknown>>}
           name="metadata"
-          errors={errors.metadata as any}
+          errors={errors.metadata as unknown as FieldErrors<Record<string, unknown>>[string]}
         />
       </div>
     </div>

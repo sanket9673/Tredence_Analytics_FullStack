@@ -5,13 +5,15 @@ import {
   Controls,
   MiniMap,
   useReactFlow,
-  Connection,
-  addEdge as rfAddEdge,
-  NodeChange,
-  EdgeChange,
+  type Node,
+  type Edge,
+  type NodeChange,
+  type EdgeChange,
+  type Connection,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@xyflow/react'
+import toast from 'react-hot-toast'
 import { useWorkflowStore } from '../../store/workflowStore'
 import { StartNode } from '../nodes/StartNode'
 import { TaskNode } from '../nodes/TaskNode'
@@ -20,7 +22,7 @@ import { AutomatedNode } from '../nodes/AutomatedNode'
 import { EndNode } from '../nodes/EndNode'
 import { CustomEdge } from './CustomEdge'
 import type { NodeType, WorkflowNode, WorkflowEdge } from '../../types'
-import { nanoid } from 'nanoid'
+import { validateWorkflowGraph } from '../../utils/graphValidation'
 
 const nodeTypes = {
   start: StartNode,
@@ -41,31 +43,53 @@ const defaultEdgeOptions = {
 }
 
 export const WorkflowCanvas: React.FC = () => {
-  const { nodes, edges, setNodes, setEdges, addNode, setSelectedNodeId, selectedNodeId, deleteNode } = useWorkflowStore()
+  const {
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    addNode,
+    addEdge,
+    setSelectedNode,
+    selectedNodeId,
+    removeNode,
+    deleteEdge,
+  } = useWorkflowStore()
   const reactFlowInstance = useReactFlow()
 
   const onNodesChange = useCallback(
-    (changes: NodeChange[]) => setNodes((nds: WorkflowNode[]) => applyNodeChanges(changes, nds) as WorkflowNode[]),
-    [setNodes]
+    (changes: NodeChange[]) => {
+      const nextNodes = applyNodeChanges(changes, nodes as unknown as Node[])
+      setNodes(nextNodes as unknown as WorkflowNode[])
+    },
+    [nodes, setNodes],
   )
 
   const onEdgesChange = useCallback(
-    (changes: EdgeChange[]) => setEdges((eds: WorkflowEdge[]) => applyEdgeChanges(changes, eds) as WorkflowEdge[]),
-    [setEdges]
+    (changes: EdgeChange[]) => {
+      const nextEdges = applyEdgeChanges(changes, edges as Edge[])
+      setEdges(nextEdges as WorkflowEdge[])
+    },
+    [edges, setEdges],
   )
 
-  const onConnect = useCallback(
-    (params: Connection) => {
-      if (params.source === params.target) return
-      const newEdge: WorkflowEdge = {
-        id: `e-${params.source}-${params.target}-${nanoid(4)}`,
-        source: params.source!,
-        target: params.target!,
-      }
-      setEdges((eds: WorkflowEdge[]) => rfAddEdge(newEdge, eds) as WorkflowEdge[])
-    },
-    [setEdges]
-  )
+  const onConnect = useCallback((params: Connection) => {
+    if (!params.source || !params.target) return
+    if (params.source === params.target) {
+      toast.error('Cannot connect a node to itself')
+      return
+    }
+    const testEdges: WorkflowEdge[] = [
+      ...edges,
+      { id: 'test-edge', source: params.source, target: params.target },
+    ]
+    const errors = validateWorkflowGraph({ nodes, edges: testEdges })
+    if (errors.some((e) => e.message.toLowerCase().includes('cycle'))) {
+      toast.error('Cannot connect: would create a cycle in the workflow')
+      return
+    }
+    addEdge({ source: params.source, target: params.target })
+  }, [nodes, edges, addEdge])
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
@@ -88,32 +112,42 @@ export const WorkflowCanvas: React.FC = () => {
     [reactFlowInstance, addNode]
   )
 
-  const onNodeClick = useCallback((_: React.MouseEvent, node: WorkflowNode) => {
-    setSelectedNodeId(node.id)
-  }, [setSelectedNodeId])
+  const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    setSelectedNode(node.id)
+  }, [setSelectedNode])
 
   const onPaneClick = useCallback(() => {
-    setSelectedNodeId(null)
-  }, [setSelectedNodeId])
+    setSelectedNode(null)
+  }, [setSelectedNode])
 
   const onKeyDown = useCallback((event: React.KeyboardEvent) => {
     if (event.key === 'Delete' || event.key === 'Backspace') {
       if (selectedNodeId) {
-        deleteNode(selectedNodeId)
+        removeNode(selectedNodeId)
       }
     }
-  }, [selectedNodeId, deleteNode])
+  }, [selectedNodeId, removeNode])
+
+  const onNodesDelete = useCallback((deletedNodes: Node[]) => {
+    deletedNodes.forEach((n) => removeNode(n.id))
+  }, [removeNode])
+
+  const onEdgesDelete = useCallback((deletedEdges: Edge[]) => {
+    deletedEdges.forEach((e) => deleteEdge(e.id))
+  }, [deleteEdge])
 
   return (
     <div className="flex-1 w-full h-full" onKeyDown={onKeyDown} tabIndex={0}>
       <ReactFlow
-        nodes={nodes as any}
-        edges={edges as any}
-        onNodesChange={onNodesChange as any}
-        onEdgesChange={onEdgesChange as any}
+        nodes={nodes as unknown as Node[]}
+        edges={edges as Edge[]}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onNodeClick={onNodeClick as any}
+        onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
+        onNodesDelete={onNodesDelete}
+        onEdgesDelete={onEdgesDelete}
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}

@@ -1,11 +1,11 @@
 import React, { useEffect } from 'react'
 import { Play, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react'
-import { useWorkflowStore } from '../../store/workflowStore'
+import { useUiStore } from '../../store/uiStore'
 import { useSimulation } from '../../hooks/useSimulation'
 import { Button } from '../ui/Button'
 
 export const SandboxPanel: React.FC = () => {
-  const { isSandboxOpen, setIsSandboxOpen } = useWorkflowStore()
+  const { isSandboxOpen, setIsSandboxOpen } = useUiStore()
   const { state, steps, totalSteps, errors, run, reset } = useSimulation()
 
   useEffect(() => {

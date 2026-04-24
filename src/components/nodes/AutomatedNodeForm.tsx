@@ -3,67 +3,67 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { automatedNodeSchema, AutomatedNodeFormData } from '../../types/schemas'
 import { useWorkflowStore } from '../../store/workflowStore'
-import { getAutomations } from '../../api/workflowApi'
-import type { AutomationAction, WorkflowNode } from '../../types'
+import { useActions } from '../../hooks/useActions'
+import type { WorkflowNode } from '../../types'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
+import { isAutomatedNode } from '../../types'
 
 interface AutomatedNodeFormProps {
   node: WorkflowNode
+  onUpdate: (id: string, data: Partial<AutomatedNodeFormData>) => void
+  onDirtyChange?: (isDirty: boolean) => void
 }
 
-export const AutomatedNodeForm: React.FC<AutomatedNodeFormProps> = ({ node }) => {
-  const { updateNodeData, pushNodeHistory } = useWorkflowStore()
-  const data = node.data as any
-
-  const [actions, setActions] = useState<AutomationAction[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    getAutomations()
-      .then(setActions)
-      .catch(console.error)
-      .finally(() => setIsLoading(false))
-  }, [])
+export const AutomatedNodeForm: React.FC<AutomatedNodeFormProps> = ({ node, onUpdate, onDirtyChange }) => {
+  const { pushNodeHistory } = useWorkflowStore()
+  const data = isAutomatedNode(node.data)
+    ? node.data
+    : { type: 'automated' as const, id: node.id, label: node.data.label, actionId: '', actionParams: {} }
+  const { actions, isLoading } = useActions()
+  const [lastActionId, setLastActionId] = useState<string>(data.actionId)
 
   const {
     register,
     control,
     watch,
     setValue,
-    formState: { errors }
+    formState: { errors, isDirty },
   } = useForm<AutomatedNodeFormData>({
-    resolver: zodResolver(automatedNodeSchema) as any,
+    resolver: zodResolver(automatedNodeSchema),
     defaultValues: {
       label: data.label,
-      actionId: data.actionId || '',
-      actionParams: data.actionParams || {}
-    }
+      actionId: data.actionId ?? '',
+      actionParams: data.actionParams ?? {},
+    },
   })
 
+  useEffect(() => {
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
+
+  const watchedValues = watch()
   const watchedActionId = watch('actionId')
   const selectedAction = actions.find(a => a.id === watchedActionId)
 
   useEffect(() => {
-    if (selectedAction && selectedAction.id !== data.actionId) {
+    if (selectedAction && selectedAction.id !== lastActionId) {
       const emptyParams = Object.fromEntries(selectedAction.params.map(p => [p, '']))
       setValue('actionParams', emptyParams, { shouldDirty: true })
+      setLastActionId(selectedAction.id)
     }
-  }, [selectedAction?.id, data.actionId, setValue])
+  }, [watchedActionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const subscription = watch((values) => {
-      const parsed = automatedNodeSchema.safeParse(values)
-      if (parsed.success) {
-        const timeoutId = setTimeout(() => {
-          pushNodeHistory(node.id, node.data)
-          updateNodeData(node.id, parsed.data)
-        }, 300)
-        return () => clearTimeout(timeoutId)
+    const timeoutId = setTimeout(() => {
+      const result = automatedNodeSchema.safeParse(watchedValues)
+      if (result.success) {
+        pushNodeHistory(node.id, node.data)
+        onUpdate(node.id, result.data)
       }
-    })
-    return () => subscription.unsubscribe()
-  }, [watch, node.id, updateNodeData, pushNodeHistory, node.data])
+    }, 300)
+    return () => clearTimeout(timeoutId)
+  }, [JSON.stringify(watchedValues)]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-6">

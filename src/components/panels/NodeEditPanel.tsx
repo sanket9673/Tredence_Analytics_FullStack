@@ -6,15 +6,22 @@ import { TaskNodeForm } from '../nodes/TaskNodeForm'
 import { ApprovalNodeForm } from '../nodes/ApprovalNodeForm'
 import { AutomatedNodeForm } from '../nodes/AutomatedNodeForm'
 import { EndNodeForm } from '../nodes/EndNodeForm'
-import { AnyNodeData } from '../../types'
+import { AnyNodeData, WorkflowNode } from '../../types'
+
+type FormProps = {
+  node: WorkflowNode
+  onUpdate: (id: string, data: Partial<AnyNodeData>) => void
+  onDirtyChange?: (isDirty: boolean) => void
+}
 
 export const NodeEditPanel: React.FC = () => {
-  const { selectedNodeId, nodes, setSelectedNodeId, nodeHistory, updateNodeData } = useWorkflowStore()
+  const { selectedNodeId, nodes, setSelectedNode, nodeHistory, updateNodeData } = useWorkflowStore()
   const selectedNode = nodes.find(n => n.id === selectedNodeId)
   
   const [showHistory, setShowHistory] = useState(false)
+  const [isFormDirty, setIsFormDirty] = useState(false)
 
-  const formMap: Record<string, React.FC<any>> = {
+  const formMap: Record<string, React.FC<FormProps>> = {
     start: StartNodeForm,
     task: TaskNodeForm,
     approval: ApprovalNodeForm,
@@ -56,6 +63,9 @@ export const NodeEditPanel: React.FC = () => {
               <span className="text-sm font-medium text-slate-800 truncate max-w-[100px]">
                 Settings
               </span>
+              {isFormDirty && (
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
+              )}
             </div>
             <div className="flex items-center gap-1">
               <div className="flex items-center gap-1 text-xs text-slate-400 mr-2" title="Auto-saving enabled">
@@ -99,7 +109,7 @@ export const NodeEditPanel: React.FC = () => {
                 )}
               </div>
               <button
-                onClick={() => setSelectedNodeId(null)}
+                onClick={() => setSelectedNode(null)}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-md transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -108,7 +118,7 @@ export const NodeEditPanel: React.FC = () => {
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-            {React.createElement(formMap[selectedNode.type], { node: selectedNode })}
+            {React.createElement(formMap[selectedNode.type], { node: selectedNode, onUpdate: updateNodeData, onDirtyChange: setIsFormDirty })}
           </div>
         </div>
       )}

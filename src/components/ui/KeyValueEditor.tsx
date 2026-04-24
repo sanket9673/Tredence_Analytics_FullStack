@@ -1,45 +1,44 @@
-import React from 'react'
-import { FieldArrayWithId, UseFormRegister, FieldErrors } from 'react-hook-form'
+import { UseFormRegister } from 'react-hook-form'
 import { Plus, Trash2 } from 'lucide-react'
 import { Input } from './Input'
 import { Button } from './Button'
 
 interface KeyValueEditorProps {
-  fields: FieldArrayWithId<any, any, 'id'>[]
+  fields: Array<{ id: string }>
   onAdd: () => void
   onRemove: (index: number) => void
-  register: UseFormRegister<any>
+  register: UseFormRegister<Record<string, unknown>>
   name: string
-  errors?: FieldErrors<any>
+  errors?: unknown
 }
 
-export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
+export const KeyValueEditor = ({
   fields,
   onAdd,
   onRemove,
   register,
   name,
   errors
-}) => {
+}: KeyValueEditorProps) => {
   return (
     <div className="space-y-2">
       <div className="space-y-2">
         {fields.map((field, index) => {
-          const fieldErrors = (errors as any)?.[index]
+          const indexedErrors = Array.isArray(errors) ? (errors[index] as { key?: { message?: string }; value?: { message?: string } }) : undefined
           return (
             <div key={field.id} className="flex gap-2 items-start animate-in fade-in duration-200">
               <div className="w-[40%]">
                 <Input
                   placeholder="Key"
                   {...register(`${name}.${index}.key`)}
-                  error={fieldErrors?.key?.message}
+                  error={typeof indexedErrors?.key?.message === 'string' ? indexedErrors.key.message : undefined}
                 />
               </div>
               <div className="w-[40%]">
                 <Input
                   placeholder="Value"
                   {...register(`${name}.${index}.value`)}
-                  error={fieldErrors?.value?.message}
+                  error={typeof indexedErrors?.value?.message === 'string' ? indexedErrors.value.message : undefined}
                 />
               </div>
               <div className="w-[20%] flex justify-end">

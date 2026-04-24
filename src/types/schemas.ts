@@ -36,8 +36,30 @@ export const endNodeSchema = z.object({
   summaryFlag: z.boolean().default(false),
 })
 
-export type StartNodeFormData = z.infer<typeof startNodeSchema>
-export type TaskNodeFormData = z.infer<typeof taskNodeSchema>
-export type ApprovalNodeFormData = z.infer<typeof approvalNodeSchema>
-export type AutomatedNodeFormData = z.infer<typeof automatedNodeSchema>
-export type EndNodeFormData = z.infer<typeof endNodeSchema>
+const workflowNodeSchema = z.object({
+  id: z.string(),
+  type: z.enum(['start', 'task', 'approval', 'automated', 'end']),
+  position: z.object({ x: z.number(), y: z.number() }),
+  data: z.object({ id: z.string(), label: z.string() }).passthrough(),
+})
+
+const workflowEdgeSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  target: z.string(),
+  label: z.string().optional(),
+})
+
+export const workflowFileSchema = z.object({
+  version: z.string(),
+  name: z.string(),
+  exportedAt: z.string(),
+  nodes: z.array(workflowNodeSchema),
+  edges: z.array(workflowEdgeSchema),
+})
+
+export type StartNodeFormData = z.input<typeof startNodeSchema>
+export type TaskNodeFormData = z.input<typeof taskNodeSchema>
+export type ApprovalNodeFormData = z.input<typeof approvalNodeSchema>
+export type AutomatedNodeFormData = z.input<typeof automatedNodeSchema>
+export type EndNodeFormData = z.input<typeof endNodeSchema>

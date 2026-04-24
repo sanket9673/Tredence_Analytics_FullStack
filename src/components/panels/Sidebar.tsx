@@ -2,9 +2,10 @@ import React from 'react'
 import { PlayCircle, CheckSquare, UserCheck, Zap, Flag, GripVertical } from 'lucide-react'
 import type { NodeType } from '../../types'
 import { useWorkflowStore } from '../../store/workflowStore'
-import { useUIStore } from '../../store/uiStore'
+import { useUiStore } from '../../store/uiStore'
 import { WORKFLOW_TEMPLATES } from '../../mocks/templates'
 import toast from 'react-hot-toast'
+import { formatDistanceToNow } from 'date-fns'
 
 const nodeItems = [
   { type: 'start' as NodeType, label: 'Start', icon: PlayCircle, color: 'text-green-500' },
@@ -15,8 +16,9 @@ const nodeItems = [
 ]
 
 export const Sidebar: React.FC = () => {
-  const { nodes, edges, loadTemplate } = useWorkflowStore()
-  const { isSidebarCollapsed } = useUIStore()
+  const { nodes, edges, loadTemplate, validationErrors, lastSaved } = useWorkflowStore()
+  const { isSidebarCollapsed } = useUiStore()
+  const errorCount = validationErrors.filter(e => e.severity === 'error').length
 
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
     event.dataTransfer.setData('nodeType', nodeType)
@@ -25,10 +27,12 @@ export const Sidebar: React.FC = () => {
 
   const handleLoadTemplate = (templateId: string) => {
     const template = WORKFLOW_TEMPLATES.find(t => t.id === templateId)
-    if (template) {
-      loadTemplate(template.nodes, template.edges)
-      toast.success(`Loaded: ${template.name}`)
+    if (!template) return
+    if (nodes.length > 0) {
+      if (!window.confirm(`Replace current workflow with "${template.name}"? This cannot be undone.`)) return
     }
+    loadTemplate(template.nodes, template.edges)
+    toast.success(`Loaded template: ${template.name}`)
   }
 
   if (isSidebarCollapsed) return null
@@ -65,6 +69,9 @@ export const Sidebar: React.FC = () => {
               >
                 <div className="text-sm font-medium text-slate-800">{template.name}</div>
                 <div className="text-xs text-slate-500 mt-0.5">{template.description}</div>
+                <div className="mt-2 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                  {template.nodes.length} nodes
+                </div>
               </button>
             ))}
           </div>
@@ -80,10 +87,15 @@ export const Sidebar: React.FC = () => {
           <span>Edges:</span>
           <span className="font-medium text-slate-700">{edges.length}</span>
         </div>
-        <div className="flex items-center gap-1.5 text-green-600 mt-2 pt-2 border-t border-slate-200">
-          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          <span>MSW active</span>
+        <div className={`flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-200 ${errorCount === 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <div className={`w-1.5 h-1.5 rounded-full ${errorCount === 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+          <span>{errorCount === 0 ? 'Valid workflow' : `${errorCount} error${errorCount > 1 ? 's' : ''}`}</span>
         </div>
+        {lastSaved && (
+          <div className="mt-2 text-slate-500">
+            Saved {formatDistanceToNow(new Date(lastSaved), { addSuffix: true })}
+          </div>
+        )}
       </div>
     </div>
   )
