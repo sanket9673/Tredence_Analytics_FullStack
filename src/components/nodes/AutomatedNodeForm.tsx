@@ -3,8 +3,8 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { automatedNodeSchema, AutomatedNodeFormData } from '../../types/schemas'
 import { useWorkflowStore } from '../../store/workflowStore'
-import { fetchAutomations } from '../../api/workflowApi'
-import { AutomationAction, WorkflowNode } from '../../types'
+import { getAutomations } from '../../api/workflowApi'
+import type { AutomationAction, WorkflowNode } from '../../types'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 
@@ -13,14 +13,14 @@ interface AutomatedNodeFormProps {
 }
 
 export const AutomatedNodeForm: React.FC<AutomatedNodeFormProps> = ({ node }) => {
-  const { updateNodeData } = useWorkflowStore()
+  const { updateNodeData, pushNodeHistory } = useWorkflowStore()
   const data = node.data as any
 
   const [actions, setActions] = useState<AutomationAction[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    fetchAutomations()
+    getAutomations()
       .then(setActions)
       .catch(console.error)
       .finally(() => setIsLoading(false))
@@ -56,13 +56,14 @@ export const AutomatedNodeForm: React.FC<AutomatedNodeFormProps> = ({ node }) =>
       const parsed = automatedNodeSchema.safeParse(values)
       if (parsed.success) {
         const timeoutId = setTimeout(() => {
+          pushNodeHistory(node.id, node.data)
           updateNodeData(node.id, parsed.data)
         }, 300)
         return () => clearTimeout(timeoutId)
       }
     })
     return () => subscription.unsubscribe()
-  }, [watch, node.id, updateNodeData])
+  }, [watch, node.id, updateNodeData, pushNodeHistory, node.data])
 
   return (
     <div className="space-y-6">
@@ -91,13 +92,14 @@ export const AutomatedNodeForm: React.FC<AutomatedNodeFormProps> = ({ node }) =>
         <div className="space-y-4 pt-4 border-t border-slate-100">
           <h4 className="text-sm font-semibold text-slate-800">Action Parameters</h4>
           {selectedAction.params.map(param => (
-            <div key={param} className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div key={param} className="space-y-1">
               <label className="text-xs font-medium text-slate-600 capitalize">
                 {param.replace(/_/g, ' ')}
               </label>
               <Controller
                 name={`actionParams.${param}`}
                 control={control}
+                defaultValue=""
                 render={({ field }) => (
                   <Input {...field} placeholder={`Enter ${param.replace(/_/g, ' ')}`} />
                 )}

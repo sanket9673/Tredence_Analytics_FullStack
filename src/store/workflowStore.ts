@@ -64,18 +64,18 @@ export const useWorkflowStore = create<WorkflowState>()(
           const id = nanoid()
           const newNode: WorkflowNode = {
             id, type, position,
-            data: { id, ...defaultDataByType[type] },
+            data: { id, ...defaultDataByType[type] } as AnyNodeData,
           }
           set(state => ({ nodes: [...state.nodes, newNode] }))
         },
 
         updateNodeData: (nodeId, data) => {
-          set(state => {
-            const updatedNodes = state.nodes.map(n =>
+          set(state => ({
+            nodes: state.nodes.map(n =>
               n.id === nodeId ? { ...n, data: { ...n.data, ...data } as AnyNodeData } : n
-            )
-            return { nodes: updatedNodes, lastSaved: new Date() }
-          })
+            ),
+            lastSaved: new Date(),
+          }))
           const errors = get().runValidation()
           set({ validationErrors: errors })
         },
@@ -107,13 +107,9 @@ export const useWorkflowStore = create<WorkflowState>()(
         })),
 
         setSelectedNodeId: (id) => set({ selectedNodeId: id }),
-
         setSimulationSteps: (steps) => set({ simulationSteps: steps }),
-
         setIsSandboxOpen: (open) => set({ isSandboxOpen: open }),
-
         loadTemplate: (nodes, edges) => set({ nodes, edges, selectedNodeId: null, validationErrors: [] }),
-
         importWorkflow: (nodes, edges) => set({ nodes, edges, selectedNodeId: null, validationErrors: [] }),
 
         runValidation: () => {
@@ -132,10 +128,11 @@ export const useWorkflowStore = create<WorkflowState>()(
           return errors
         },
       }),
-      { name: 'hr-workflow-storage', partialize: (s) => ({ nodes: s.nodes, edges: s.edges }) }
+      {
+        name: 'hr-workflow-storage',
+        partialize: (s) => ({ nodes: s.nodes, edges: s.edges }),
+      }
     ),
     { limit: 50 }
   )
 )
-
-export const useTemporalStore = (selector: (s: any) => any) => useWorkflowStore.temporal(selector)

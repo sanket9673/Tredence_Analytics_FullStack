@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Toaster } from 'react-hot-toast'
@@ -28,13 +28,13 @@ function App() {
   }, [])
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50 text-slate-900 font-sans">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50 font-sans">
       <TopBar />
-      
+
       <div className="flex-1 flex overflow-hidden relative">
         <Sidebar />
-        
-        <main className="flex-1 relative">
+
+        <main className={`flex-1 relative overflow-hidden transition-all duration-300 ${isSandboxOpen ? 'pb-[408px]' : ''}`}>
           <ReactFlowProvider>
             <WorkflowCanvas />
           </ReactFlowProvider>
@@ -44,7 +44,17 @@ function App() {
       </div>
 
       <SandboxPanel />
-      <Toaster position="bottom-right" />
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            fontSize: '13px',
+            fontWeight: 500,
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0',
+          }
+        }}
+      />
     </div>
   )
 }

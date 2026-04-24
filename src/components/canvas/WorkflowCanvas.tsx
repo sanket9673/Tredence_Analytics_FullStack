@@ -1,4 +1,4 @@
-import React, { useCallback, KeyboardEvent } from 'react'
+import React, { useCallback } from 'react'
 import {
   ReactFlow,
   Background,
@@ -6,7 +6,6 @@ import {
   MiniMap,
   useReactFlow,
   Connection,
-  Edge,
   addEdge as rfAddEdge,
   NodeChange,
   EdgeChange,
@@ -20,8 +19,8 @@ import { ApprovalNode } from '../nodes/ApprovalNode'
 import { AutomatedNode } from '../nodes/AutomatedNode'
 import { EndNode } from '../nodes/EndNode'
 import { CustomEdge } from './CustomEdge'
-import { NodeType, WorkflowNode } from '../../types'
-import { v4 as uuidv4 } from 'uuid'
+import type { NodeType, WorkflowNode, WorkflowEdge } from '../../types'
+import { nanoid } from 'nanoid'
 
 const nodeTypes = {
   start: StartNode,
@@ -42,26 +41,28 @@ const defaultEdgeOptions = {
 }
 
 export const WorkflowCanvas: React.FC = () => {
-  const { nodes, edges, setNodes, setEdges, addNode, addEdge, setSelectedNodeId, selectedNodeId, deleteNode, deleteEdge } = useWorkflowStore()
+  const { nodes, edges, setNodes, setEdges, addNode, setSelectedNodeId, selectedNodeId, deleteNode } = useWorkflowStore()
   const reactFlowInstance = useReactFlow()
 
   const onNodesChange = useCallback(
-    (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    (changes: NodeChange[]) => setNodes((nds: WorkflowNode[]) => applyNodeChanges(changes, nds) as WorkflowNode[]),
     [setNodes]
   )
 
   const onEdgesChange = useCallback(
-    (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+    (changes: EdgeChange[]) => setEdges((eds: WorkflowEdge[]) => applyEdgeChanges(changes, eds) as WorkflowEdge[]),
     [setEdges]
   )
 
   const onConnect = useCallback(
-    (params: Connection | Edge) => {
-      // Validate connection (no cycles, no self-loops) - simplified here, full in utils
+    (params: Connection) => {
       if (params.source === params.target) return
-      
-      const newEdge = { ...params, id: `e-${params.source}-${params.target}`, type: 'custom' }
-      setEdges((eds) => rfAddEdge(newEdge, eds))
+      const newEdge: WorkflowEdge = {
+        id: `e-${params.source}-${params.target}-${nanoid(4)}`,
+        source: params.source!,
+        target: params.target!,
+      }
+      setEdges((eds: WorkflowEdge[]) => rfAddEdge(newEdge, eds) as WorkflowEdge[])
     },
     [setEdges]
   )
@@ -74,7 +75,6 @@ export const WorkflowCanvas: React.FC = () => {
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault()
-
       const type = event.dataTransfer.getData('nodeType') as NodeType
       if (!type) return
 
@@ -83,27 +83,7 @@ export const WorkflowCanvas: React.FC = () => {
         y: event.clientY,
       })
 
-      const newNode: WorkflowNode = {
-        id: uuidv4(),
-        type,
-        position,
-        data: { id: uuidv4(), label: `New ${type} node` } as any, // Initialize with defaults based on type later
-      }
-
-      // Add basic defaults
-      if (type === 'start') {
-        newNode.data = { ...newNode.data, metadata: [] }
-      } else if (type === 'task') {
-        newNode.data = { ...newNode.data, description: '', assignee: '', dueDate: '', customFields: [] }
-      } else if (type === 'approval') {
-        newNode.data = { ...newNode.data, approverRole: 'Manager', autoApproveThreshold: 80 }
-      } else if (type === 'automated') {
-        newNode.data = { ...newNode.data, actionId: '', actionParams: {} }
-      } else if (type === 'end') {
-        newNode.data = { ...newNode.data, endMessage: '', summaryFlag: false }
-      }
-
-      addNode(newNode)
+      addNode(type, position)
     },
     [reactFlowInstance, addNode]
   )
@@ -127,14 +107,13 @@ export const WorkflowCanvas: React.FC = () => {
   return (
     <div className="flex-1 w-full h-full" onKeyDown={onKeyDown} tabIndex={0}>
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        nodes={nodes as any}
+        edges={edges as any}
+        onNodesChange={onNodesChange as any}
+        onEdgesChange={onEdgesChange as any}
         onConnect={onConnect}
-        onNodeClick={onNodeClick}
+        onNodeClick={onNodeClick as any}
         onPaneClick={onPaneClick}
-        onInit={() => {}}
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
@@ -144,9 +123,24 @@ export const WorkflowCanvas: React.FC = () => {
         snapGrid={[16, 16]}
         fitView
       >
-        <Background color="#ccc" gap={16} />
+        <Background color="#e2e8f0" gap={16} />
         <Controls />
-        <MiniMap zoomable pannable nodeClassName={(n) => `node-${n.type}`} />
+        <MiniMap
+          zoomable
+          pannable
+          nodeColor={(node) => {
+            const colors: Record<string, string> = {
+              start: '#22c55e',
+              task: '#3b82f6',
+              approval: '#f59e0b',
+              automated: '#8b5cf6',
+              end: '#f43f5e',
+            }
+            return colors[node.type as string] ?? '#94a3b8'
+          }}
+          nodeStrokeWidth={2}
+          className="rounded-lg border border-slate-200"
+        />
       </ReactFlow>
     </div>
   )

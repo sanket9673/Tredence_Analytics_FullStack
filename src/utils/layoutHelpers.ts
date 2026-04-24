@@ -1,15 +1,16 @@
 import dagre from 'dagre'
-import { WorkflowNode, WorkflowEdge } from '../types'
+import type { WorkflowNode, WorkflowEdge } from '../types'
 
-const dagreGraph = new dagre.graphlib.Graph()
-dagreGraph.setDefaultEdgeLabel(() => ({}))
+const NODE_WIDTH = 220
+const NODE_HEIGHT = 80
 
-export const getLayoutedElements = (nodes: WorkflowNode[], edges: WorkflowEdge[], direction = 'LR') => {
-  const isHorizontal = direction === 'LR'
-  dagreGraph.setGraph({ rankdir: direction })
+export const getLayoutedElements = (nodes: WorkflowNode[], edges: WorkflowEdge[], direction = 'TB') => {
+  const dagreGraph = new dagre.graphlib.Graph()
+  dagreGraph.setDefaultEdgeLabel(() => ({}))
+  dagreGraph.setGraph({ rankdir: direction, ranksep: 80, nodesep: 60 })
 
   nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: 200, height: 100 }) // approximate dimensions
+    dagreGraph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
   })
 
   edges.forEach((edge) => {
@@ -19,12 +20,12 @@ export const getLayoutedElements = (nodes: WorkflowNode[], edges: WorkflowEdge[]
   dagre.layout(dagreGraph)
 
   const newNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id)
+    const pos = dagreGraph.node(node.id)
     return {
       ...node,
       position: {
-        x: nodeWithPosition.x - 100, // adjust to center
-        y: nodeWithPosition.y - 50,
+        x: pos.x - NODE_WIDTH / 2,
+        y: pos.y - NODE_HEIGHT / 2,
       },
     }
   })
