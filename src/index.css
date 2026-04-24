@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply m-0 text-slate-800 bg-slate-50 font-sans;
+  }
+}
+
+.react-flow__node {
+  @apply rounded-lg shadow-sm bg-white border border-slate-200 transition-all;
+}
+
+.react-flow__node.selected {
+  @apply ring-2 ring-blue-500 ring-offset-2 border-transparent;
+}
+
+/* Base custom node styles */
+.custom-node {
+  @apply flex flex-col min-w-[200px] bg-white rounded-lg relative overflow-hidden;
+}
+
+.custom-node-header {
+  @apply flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-slate-50;
+}
+
+.custom-node-body {
+  @apply p-3 flex flex-col gap-1;
+}
+
+.custom-node-title {
+  @apply text-sm font-semibold text-slate-800;
+}
+
+.custom-node-meta {
+  @apply text-xs text-slate-500;
+}
+
+/* Colors for specific node types */
+.node-start {
+  @apply border-l-[3px] border-l-green-500;
+}
+.node-task {
+  @apply border-l-[3px] border-l-blue-500;
+}
+.node-approval {
+  @apply border-l-[3px] border-l-amber-500;
+}
+.node-automated {
+  @apply border-l-[3px] border-l-violet-500;
+}
+.node-end {
+  @apply border-l-[3px] border-l-rose-500;
+}
+
+/* Status dots */
+.status-dot {
+  @apply w-2 h-2 rounded-full absolute top-2.5 right-2.5;
+}
+.status-idle { @apply bg-slate-300; }
+.status-running { @apply bg-blue-500 animate-pulse; }
+.status-completed { @apply bg-green-500; }
+.status-failed { @apply bg-red-500; }
+.status-pending { @apply bg-amber-500; }
